@@ -23,6 +23,11 @@ except ImportError:
     from urlparse import urlparse, parse_qs
     from urllib import quote, unquote
 
+try:
+    import boto3
+except ImportError:
+    boto3 = None
+
 from requests.auth import AuthBase
 from .six import PY2, text_type
 from .aws4signingkey import AWS4SigningKey
@@ -259,6 +264,9 @@ class AWS4Auth(AuthBase):
             self.default_include_headers.append('x-amz-security-token')
         self.include_hdrs = kwargs.get('include_hdrs',
                                        self.default_include_headers)
+        self.use_boto_session = kwargs.get('use_boto_session', False)
+        if self.use_boto_session:
+            self._boto_credentials = boto3.Session().get_credentials()
         AuthBase.__init__(self)
 
     def regenerate_signing_key(self, secret_key=None, region=None,
@@ -344,6 +352,8 @@ class AWS4Auth(AuthBase):
         else:
             content_hash = hashlib.sha256(b'')
         req.headers['x-amz-content-sha256'] = content_hash.hexdigest()
+        if self.use_boto_session:
+            self.refresh_boto_credentials()
         if self.session_token:
             req.headers['x-amz-security-token'] = self.session_token
 
@@ -363,6 +373,12 @@ class AWS4Auth(AuthBase):
         auth_str += 'Signature={}'.format(sig)
         req.headers['Authorization'] = auth_str
         return req
+
+    def refresh_boto_credentials(self):
+        temporary_creds = self._boto_credentials.get_frozen_credentials()
+        self.access_id = temporary_creds.access_key
+        self.session_token = temporary_creds.token
+        self.regenerate_signing_key(secret_key=temporary_creds.secret_key)
 
     @classmethod
     def get_request_date(cls, req):
