@@ -100,6 +100,24 @@ the session token. Temporary credential timeouts are not managed -- in
 case the temporary credentials expire, they need to be re-generated and
 the AWS4Auth object re-constructed with the new credentials.
 
+Dynamic STS Credentials using botocore RefreshableCredentials
+-------------------------------------------------------------
+.. code-block:: python
+
+    >>> from requests_aws4auth import AWS4Auth
+    >>> from botocore.session import Session
+    >>> credentials = Session().get_credentials()
+    >>> auth = AWS4Auth(region='eu-west-1', service='es',
+                        refreshable_credentials=credentials)
+    ...
+
+This example shows how to construct an AWS4Auth instance with
+automatically refreshing credentials, suitable for long-running
+applications using AWS IAM assume-role.
+The RefreshableCredentials instance is used to generate valid static
+credentials per-request, eliminating the need to recreate the AWS4Auth
+instance when temporary credentials expire.
+
 Date handling
 -------------
 If an HTTP request to be authenticated contains a ``Date`` or ``X-Amz-Date``
